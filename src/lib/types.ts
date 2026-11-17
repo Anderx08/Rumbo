@@ -15,6 +15,8 @@ export interface Account {
   id: string;
   name: string;
   type: AccountType;
+  /** La cuenta que se usa sin preguntar al anotar movimientos. */
+  primary?: boolean;
   currency: Currency;
   /** Saldo inicial. Negativo para deudas (tarjeta, préstamo). */
   opening: Money;
@@ -54,7 +56,7 @@ export interface Category {
   /** Para la regla 50/30/20. Solo gastos. */
   group?: CatGroup;
   icon: string;
-  /** Índice 0-9 en la paleta categórica del mundo visual activo. */
+  /** Índice 0-7 en la paleta categórica (--k0 a --k7). */
   hue: number;
   archived?: boolean;
 }
@@ -144,15 +146,30 @@ export interface Data {
   settings: Settings;
 }
 
-export type World = "rutas" | "mosaicos" | "senal" | "clasico";
 export type Mode = "light" | "dark" | "system";
 
 export interface UiPrefs {
-  world: World;
   mode: Mode;
 }
 
 export const LIABILITY_TYPES: AccountType[] = ["credit", "loan"];
 export const LIQUID_TYPES: AccountType[] = ["cash", "checking", "savings"];
+/** Cuentas de las que sale el gasto del día a día (no ahorros ni inversión). */
+export const SPENDING_TYPES: AccountType[] = ["cash", "checking"];
 
 export const isLiability = (a: Account) => LIABILITY_TYPES.includes(a.type);
+
+/**
+ * La cuenta que se usa cuando la persona no elige ninguna: la marcada como
+ * principal, si no la primera de dinero disponible, si no la primera.
+ */
+export function defaultAccountId(accounts: Account[]): string {
+  const open = accounts.filter((a) => !a.archived);
+  return (
+    open.find((a) => a.primary)?.id ??
+    open.find((a) => SPENDING_TYPES.includes(a.type))?.id ??
+    open.find((a) => !isLiability(a))?.id ??
+    open[0]?.id ??
+    ""
+  );
+}

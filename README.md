@@ -41,7 +41,7 @@ npm start
 
 | Ruta | Qué hace |
 | --- | --- |
-| `/` | Panel: lo que queda del mes, próximos pagos, las cuatro líneas (gastos, metas, deudas, largo plazo), salud financiera |
+| `/` | Panel: lo que queda del mes, aviso de quincena, próximos pagos, las líneas hacia gastos, metas, deudas y largo plazo, salud financiera |
 | `/movimientos` | Registro con búsqueda y filtros. Tecla `N` para anotar desde cualquier pantalla |
 | `/presupuesto` | Tope mensual por categoría, ritmo frente al día del mes, regla 50/30/20 |
 | `/metas` | Metas de ahorro con aportes y fecha de llegada proyectada |
@@ -56,8 +56,8 @@ npm start
 
 - `src/lib/engine.ts`: cálculos puros (saldos, flujo, presupuesto, metas, deudas, proyección). Probados en `engine.test.ts`.
 - `src/lib/store.ts`: estado con Zustand, persistido en `localStorage` bajo `rumbo:v1`.
-- `src/app/globals.css`: tokens de los cuatro mundos visuales (Rutas, Mosaicos, Señalética, Clásico) y sus modos.
-- `src/components/`: componentes compartidos; `hero.tsx` tiene la cabecera del panel de cada mundo.
+- `src/app/globals.css`: tokens de la apariencia Clásica, con modo claro y oscuro.
+- `src/components/`: componentes compartidos; `forms.tsx` tiene los formularios y `hero.tsx` la cabecera del panel.
 
 Los montos se guardan como enteros en unidades menores (céntimos) para evitar errores de redondeo.
 

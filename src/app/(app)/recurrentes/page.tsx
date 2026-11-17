@@ -37,7 +37,7 @@ export default function RecurrentesPage() {
     <>
       <PageHead
         title="Recurrentes"
-        sub="Lo que se repite: salario, alquiler, servicios, suscripciones. Llega la fecha, lo registras con un toque y el saldo queda al día."
+        sub="Lo que se repite: quincena, alquiler, servicios, suscripciones. Llega la fecha, lo registras con un toque y el saldo queda al día."
         actions={
           <Button variant="primary" onClick={() => setEditing({})} disabled={!data.accounts.length}>
             <Plus aria-hidden="true" />
@@ -102,7 +102,8 @@ export default function RecurrentesPage() {
                           {!r.active ? <Chip>En pausa</Chip> : null}
                         </span>
                         <span className="row-sub block">
-                          {freq} · próximo {fmtDate(r.nextDate)} · {account?.name}
+                          {freq} · próximo {fmtDate(r.nextDate)}
+                          {data.accounts.length > 1 && account ? ` · ${account.name}` : ""}
                         </span>
                       </span>
                       <span className={r.type === "income" ? "amount amount-pos" : "amount"}>

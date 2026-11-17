@@ -8,11 +8,8 @@ import type { Health, Insight } from "@/lib/health";
 import { fmt } from "@/lib/money";
 import { useSheets } from "@/lib/sheets";
 import { useStore } from "@/lib/store";
-import type { Account, Category, Tx, World } from "@/lib/types";
+import type { Account, Category, Tx } from "@/lib/types";
 import { Bullet, Button, Track } from "./ui";
-
-export const upcomingTitle = (world: World) =>
-  world === "rutas" ? "Próximas paradas" : world === "senal" ? "Próximas salidas" : "Próximos pagos";
 
 const TYPE_LABEL = { expense: "Gasto", income: "Ingreso", transfer: "Transferencia" } as const;
 
@@ -37,10 +34,12 @@ export function TxRow({
   const cat = categories.get(tx.categoryId ?? "");
   const currency = from?.currency ?? "CRC";
   const title = tx.note || cat?.name || TYPE_LABEL[tx.type];
+  // Con una sola cuenta no tiene sentido repetir su nombre en cada fila.
+  const showAccount = accounts.size > 1;
   const where =
     tx.type === "transfer"
       ? `${from?.name ?? "Cuenta"} a ${to?.name ?? "cuenta"}`
-      : [cat && tx.note ? cat.name : null, from?.name].filter(Boolean).join(" · ");
+      : [cat && tx.note ? cat.name : null, showAccount ? from?.name : null].filter(Boolean).join(" · ");
   const received =
     tx.type === "transfer" && from && to && from.currency !== to.currency
       ? ` (llegan ${fmt(transferIn(tx, accounts, usdRate), to.currency)})`
@@ -98,7 +97,8 @@ export function UpcomingRow({
         <div className="row-title">{r.name}</div>
         <div className="row-sub">
           {overdue ? "Pendiente desde " : ""}
-          {fmtRelative(date, today).toLowerCase()} · {account?.name}
+          {fmtRelative(date, today).toLowerCase()}
+          {accounts.size > 1 && account ? ` · ${account.name}` : ""}
         </div>
       </div>
       <div className="flex items-center gap-2">

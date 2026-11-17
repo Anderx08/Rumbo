@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { today } from "./dates";
-import { advance } from "./engine";
+import { advance, nextPayday, postingDate } from "./engine";
 import { demoData, emptyData, uid } from "./seed";
 import type {
   Account,
@@ -12,34 +12,35 @@ import type {
   Data,
   Goal,
   Mode,
+  Money,
   Recurring,
   Settings,
   Tx,
   UiPrefs,
-  World,
 } from "./types";
 
 const UI_KEY = "rumbo:ui";
-const DEFAULT_UI: UiPrefs = { world: "rutas", mode: "system" };
+const DEFAULT_UI: UiPrefs = { mode: "system" };
+const MODES: Mode[] = ["light", "dark", "system"];
 
 function readUi(): UiPrefs {
   try {
     const raw = JSON.parse(localStorage.getItem(UI_KEY) ?? "null");
-    if (raw?.world && raw?.mode) return raw as UiPrefs;
+    if (MODES.includes(raw?.mode)) return { mode: raw.mode };
   } catch {
     /* almacenamiento bloqueado: se usa el valor por defecto */
   }
   return DEFAULT_UI;
 }
 
-/** Aplica el mundo visual y el modo al documento, y los recuerda. */
+/** Aplica el modo claro u oscuro al documento y lo recuerda. */
 export function applyUi(ui: UiPrefs) {
   const root = document.documentElement;
   const dark =
     ui.mode === "dark" ||
     (ui.mode === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
-  root.dataset.world = ui.world;
+  delete root.dataset.world;
   root.dataset.mode = dark ? "dark" : "light";
   try {
     localStorage.setItem(UI_KEY, JSON.stringify(ui));
@@ -50,16 +51,24 @@ export function applyUi(ui: UiPrefs) {
 
 type NewTx = Omit<Tx, "id" | "createdAt">;
 
+export interface StartOptions {
+  name: string;
+  /** Lo que la persona tiene hoy, en colones. */
+  balance: Money;
+  /** Lo que recibe cada quincena; 0 si no aplica. */
+  quincena: Money;
+}
+
 interface State {
   data: Data;
   ui: UiPrefs;
   hydrated: boolean;
 
   hydrate: () => void;
-  setWorld: (world: World) => void;
   setMode: (mode: Mode) => void;
 
-  startEmpty: (name: string, account: Omit<Account, "id">, settings: Partial<Settings>) => void;
+  /** Crea la cuenta principal y, si hay quincena, el ingreso que se repite. */
+  startEmpty: (opts: StartOptions) => void;
   startDemo: (name: string) => void;
   replaceData: (data: Data) => void;
   resetAll: () => void;
@@ -70,6 +79,8 @@ interface State {
 
   addAccount: (a: Omit<Account, "id">) => void;
   updateAccount: (id: string, patch: Partial<Account>) => void;
+  /** Marca una cuenta como la principal y desmarca las demás. */
+  setPrimary: (id: string) => void;
   /** Devuelve false si la cuenta tiene movimientos y no se puede borrar. */
   deleteAccount: (id: string) => boolean;
 
@@ -110,12 +121,10 @@ export const useStore = create<State>()(
         hydrate: () => {
           if (get().hydrated) return;
           let ui = readUi();
-          // Enlaces de demostración: /?ejemplo=1&mundo=mosaicos&modo=dark
+          // Enlaces de demostración: /?ejemplo=1&modo=dark
           const query = new URLSearchParams(window.location.search);
-          const world = query.get("mundo") as World | null;
           const mode = query.get("modo") as Mode | null;
-          if (world && ["rutas", "mosaicos", "senal", "clasico"].includes(world)) ui = { ...ui, world };
-          if (mode && ["light", "dark", "system"].includes(mode)) ui = { ...ui, mode };
+          if (mode && MODES.includes(mode)) ui = { mode };
           applyUi(ui);
           void Promise.resolve(useStore.persist.rehydrate()).then(() => {
             set({ ui, hydrated: true });
@@ -125,26 +134,46 @@ export const useStore = create<State>()(
             }
           });
         },
-        setWorld: (world) => {
-          const ui = { ...get().ui, world };
-          applyUi(ui);
-          set({ ui });
-        },
         setMode: (mode) => {
-          const ui = { ...get().ui, mode };
+          const ui = { mode };
           applyUi(ui);
           set({ ui });
         },
 
-        startEmpty: (name, account, settings) =>
+        startEmpty: ({ name, balance, quincena }) =>
           set(() => {
             const d = emptyData();
+            const account: Account = {
+              id: uid(),
+              name: "Mi dinero",
+              type: "checking",
+              currency: "CRC",
+              opening: Math.max(0, balance),
+              primary: true,
+            };
+            const recurring: Recurring[] =
+              quincena > 0
+                ? [
+                    {
+                      id: uid(),
+                      name: "Quincena",
+                      type: "income",
+                      amount: quincena,
+                      accountId: account.id,
+                      categoryId: "salario",
+                      frequency: "semimonthly",
+                      nextDate: nextPayday(today()),
+                      active: true,
+                    },
+                  ]
+                : [];
             return {
               data: {
                 ...d,
                 onboarded: true,
-                accounts: [{ ...account, id: uid() }],
-                settings: { ...d.settings, ...settings, name },
+                accounts: [account],
+                recurring,
+                settings: { ...d.settings, name },
               },
             };
           }),
@@ -162,10 +191,28 @@ export const useStore = create<State>()(
           })),
         deleteTx: (id) => mutate((d) => ({ txs: d.txs.filter((t) => t.id !== id) })),
 
-        addAccount: (a) => mutate((d) => ({ accounts: [...d.accounts, { ...a, id: uid() }] })),
+        addAccount: (a) =>
+          mutate((d) => ({
+            accounts: [
+              ...d.accounts,
+              // La primera cuenta de dinero pasa a ser la principal.
+              {
+                ...a,
+                id: uid(),
+                primary:
+                  a.primary ??
+                  (!["credit", "loan"].includes(a.type) &&
+                    !d.accounts.some((x) => !["credit", "loan"].includes(x.type))),
+              },
+            ],
+          })),
         updateAccount: (id, patch) =>
           mutate((d) => ({
             accounts: d.accounts.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+          })),
+        setPrimary: (id) =>
+          mutate((d) => ({
+            accounts: d.accounts.map((a) => ({ ...a, primary: a.id === id })),
           })),
         deleteAccount: (id) => {
           const d = get().data;
@@ -244,7 +291,7 @@ export const useStore = create<State>()(
             const tx: Tx = {
               id: uid(),
               createdAt: Date.now(),
-              date: r.nextDate,
+              date: postingDate(r.nextDate, today()),
               type: r.type,
               amount: r.amount,
               accountId: r.accountId,

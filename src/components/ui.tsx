@@ -45,9 +45,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
 import { fmt, parseAmount, toInput } from "@/lib/money";
-import { nextSection, sectionFor } from "@/lib/nav";
 import type { Currency, Money as Cents } from "@/lib/types";
 
 export const cx = (...parts: (string | false | null | undefined)[]) =>
@@ -242,14 +240,17 @@ export function MoneyInput({
   autoFocus,
   invalid,
   placeholder = "0",
+  label,
 }: {
   value: Cents;
   onChange: (cents: Cents) => void;
   currency: Currency;
   large?: boolean;
+  /** Recibe el foco al abrirse la hoja (sin mover el desplazamiento). */
   autoFocus?: boolean;
   invalid?: boolean;
   placeholder?: string;
+  label?: string;
 }) {
   const [text, setText] = useState(value ? toInput(value, currency) : "");
   return (
@@ -259,7 +260,7 @@ export function MoneyInput({
         className="input"
         inputMode="decimal"
         autoComplete="off"
-        autoFocus={autoFocus}
+        aria-label={label}
         data-autofocus={autoFocus ? "" : undefined}
         aria-invalid={invalid || undefined}
         placeholder={placeholder}
@@ -278,11 +279,14 @@ export function Segmented<T extends string>({
   value,
   onChange,
   label,
+  wide,
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   label: string;
+  /** Ocupa todo el ancho con botones grandes. */
+  wide?: boolean;
 }) {
   const move = (dir: 1 | -1) => {
     const i = options.findIndex((o) => o.value === value);
@@ -290,7 +294,7 @@ export function Segmented<T extends string>({
   };
   return (
     <div
-      className="seg"
+      className={wide ? "seg seg-wide" : "seg"}
       role="radiogroup"
       aria-label={label}
       onKeyDown={(e) => {
@@ -434,20 +438,10 @@ export function PageHead({
   sub?: ReactNode;
   actions?: ReactNode;
 }) {
-  const section = sectionFor(usePathname());
-  const peek = nextSection(section.href);
   return (
     <header className="pagehead">
       <div className="pagehead-main">
-        <div className="pagehead-title">
-          <Bullet tone={section.tone} icon={section.icon} size="lg" />
-          <h1 className="h-page">
-            {title}
-            <span className="peek" aria-hidden="true">
-              {peek.label}
-            </span>
-          </h1>
-        </div>
+        <h1 className="h-page">{title}</h1>
         {sub ? <p className="pagehead-sub">{sub}</p> : null}
       </div>
       {actions ? <div className="pagehead-actions">{actions}</div> : null}
@@ -533,8 +527,11 @@ export function Sheet({
     if (!dialog) return;
     if (open && !dialog.open) {
       dialog.showModal();
-      // showModal enfoca el botón de cerrar; el foco debe ir al primer campo útil.
-      dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+      // Siempre se abre desde arriba, para que el selector de tipo quede a la vista.
+      dialog.querySelectorAll(".sheet-content").forEach((el) => (el.scrollTop = 0));
+      // showModal enfoca el botón de cerrar; el foco va al primer campo útil, sin
+      // desplazar el contenido (si no, en el celular se esconde lo de arriba).
+      dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus({ preventScroll: true });
     }
     if (!open && dialog.open) dialog.close();
   }, [open]);

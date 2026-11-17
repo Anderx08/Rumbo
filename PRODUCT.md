@@ -33,12 +33,14 @@ No es solo un registro de gastos: cada movimiento alimenta proyecciones con fech
 - Prioridades confirmadas por el usuario, todas: controlar gastos, salir de deudas, ahorrar para metas, invertir a largo plazo.
 - Módulos: panel, movimientos, presupuesto, metas de ahorro, cuentas y patrimonio, deudas, pagos recurrentes, plan de largo plazo, reportes, ajustes.
 - Datos locales en el dispositivo (sin cuenta ni servidor), con exportar e importar respaldo. Sincronización entre dispositivos: no decidida, posible más adelante.
+- Empezar y anotar sin elegir cuentas (pedido del usuario): al empezar se crea la cuenta principal «Mi dinero» y, si cobra por quincena, el ingreso que se repite el 15 y fin de mes. Los formularios solo preguntan la cuenta cuando hay más de una.
+- Registrar la quincena debe ser un toque: aviso en el panel cuando toca y botón «Registrar ingreso».
 - No se conecta a bancos; el registro es manual.
 - Interfaz en español (Costa Rica).
 
 ## Brand Commitments
 
-Nombre de trabajo: Rumbo (propuesto, no confirmado por el usuario).
+Nombre: Rumbo. Una sola apariencia, la Clásica (estándar fintech), con modo claro y oscuro: el usuario pidió quitar las demás.
 
 ## Evidence on Hand
 

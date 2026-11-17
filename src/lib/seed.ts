@@ -105,7 +105,7 @@ export function demoData(todayIso: string, name = ""): Data {
 
   const accounts: Account[] = [
     { id: "efectivo", name: "Efectivo", type: "cash", currency: "CRC", opening: col(28_000) },
-    { id: "corriente", name: "Cuenta corriente", type: "checking", currency: "CRC", opening: col(180_000) },
+    { id: "corriente", name: "Cuenta corriente", type: "checking", currency: "CRC", opening: col(180_000), primary: true },
     { id: "ahorros", name: "Ahorros", type: "savings", currency: "CRC", opening: col(900_000) },
     { id: "inversion", name: "Fondo de inversión", type: "investment", currency: "USD", opening: 210_000 },
     {

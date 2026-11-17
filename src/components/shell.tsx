@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Ellipsis, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { Ellipsis, Monitor, Moon, Plus, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -16,7 +16,7 @@ import { Button, Icon, Logo, Sheet } from "./ui";
 const MODES: { value: Mode; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Modo claro", icon: Sun },
   { value: "dark", label: "Modo oscuro", icon: Moon },
-  { value: "system", label: "Seguir al sistema", icon: Monitor },
+  { value: "system", label: "Como el sistema", icon: Monitor },
 ];
 
 function ModeToggle() {
@@ -33,10 +33,7 @@ function ModeToggle() {
       onClick={() => setMode(next.value)}
       aria-label={`${current.label}. Cambiar a ${next.label.toLowerCase()}`}
     >
-      <span className="nav-dot" />
-      <span className="nav-pict">
-        <I aria-hidden="true" />
-      </span>
+      <I aria-hidden="true" />
       {current.label}
     </button>
   );
@@ -55,12 +52,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           aria-current={s.href === active ? "page" : undefined}
           onClick={onNavigate}
         >
-          <span className="nav-dot" />
-          <span className="nav-pict">
-            <Icon name={s.icon} />
-          </span>
+          <Icon name={s.icon} />
           {s.label}
-          <ArrowRight className="nav-arrow" aria-hidden="true" />
         </Link>
       ))}
     </nav>
@@ -75,12 +68,10 @@ function Sidebar() {
         <Logo />
         Rumbo
       </Link>
-      <div className="side-action">
-        <Button variant="primary" className="w-full" onClick={() => openTx()}>
-          <Plus aria-hidden="true" />
-          Anotar movimiento
-        </Button>
-      </div>
+      <Button variant="primary" className="w-full" onClick={() => openTx()}>
+        <Plus aria-hidden="true" />
+        Anotar movimiento
+      </Button>
       <NavLinks />
       <div className="mt-auto">
         <ModeToggle />
@@ -120,10 +111,8 @@ function TabBar() {
       </nav>
       <Sheet open={more} onClose={() => setMore(false)} title="Secciones">
         <div className="sheet-content">
-          <div className="side side-inline">
-            <NavLinks onNavigate={() => setMore(false)} />
-            <ModeToggle />
-          </div>
+          <NavLinks onNavigate={() => setMore(false)} />
+          <ModeToggle />
         </div>
       </Sheet>
     </>
@@ -138,8 +127,8 @@ function DemoBanner() {
   return (
     <div className="notice mb-5" role="status">
       <span className="font-semibold">Estás viendo datos de ejemplo.</span>
-      <span className="muted-on-notice">Son ficticios: sirven para recorrer la app.</span>
-      <span className="ml-auto flex flex-wrap gap-3">
+      <span className="notice-quiet">Son ficticios: sirven para recorrer la app.</span>
+      <span className="ml-auto">
         {armed ? (
           <button type="button" className="linkish" onClick={resetAll}>
             Sí, borrar el ejemplo
@@ -168,7 +157,11 @@ function Skeleton() {
       </aside>
       <main className="main">
         <div className="skeleton mb-6 h-9 w-64" />
-        <div className="skeleton mb-4 h-44 w-full" />
+        <div className="mb-4 grid grid-cols-2 gap-4 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="skeleton h-24" />
+          ))}
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="skeleton h-56" />
           <div className="skeleton h-56" />

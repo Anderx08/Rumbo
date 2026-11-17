@@ -39,7 +39,7 @@ export default function CuentasPage() {
         <span className="min-w-0">
           <span className="row-title block">{a.name}</span>
           <span className="row-sub block">
-            {accountTypeLabel(a.type)}
+            {accountTypeLabel(a)}
             {a.apr != null ? ` · ${String(a.apr).replace(".", ",")}% anual` : ""}
           </span>
         </span>

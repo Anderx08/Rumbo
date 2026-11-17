@@ -10,7 +10,6 @@ export function useToday() {
   return value;
 }
 
-export const useWorld = () => useStore((s) => s.ui.world);
 export const useBase = () => useStore((s) => s.data.settings.base);
 
 /**
@@ -23,9 +22,7 @@ export function useWidth<T extends HTMLElement>() {
   const ref = useCallback((el: T | null) => {
     if (!el) return;
     setWidth(Math.round(el.getBoundingClientRect().width));
-    const ro = new ResizeObserver(([entry]) =>
-      setWidth(Math.round(entry.contentRect.width)),
-    );
+    const ro = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);

@@ -3,7 +3,7 @@
 import { Download, Smartphone, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { CategorySheet } from "@/components/forms";
-import { ModePicker, WorldPicker } from "@/components/onboarding";
+import { ModePicker } from "@/components/onboarding";
 import { Bullet, Button, Chip, ConfirmButton, Field, PageHead, Panel, Segmented } from "@/components/ui";
 import { download, exportJSON, parseBackup, toCSV } from "@/lib/backup";
 import { useToday } from "@/lib/hooks";
@@ -137,15 +137,12 @@ export default function AjustesPage() {
 
   return (
     <>
-      <PageHead title="Ajustes" sub="Apariencia, monedas, categorías y tus datos." />
+      <PageHead title="Ajustes" sub="Modo de color, monedas, categorías y tus datos." />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="grid gap-4">
-          <Panel title="Apariencia">
-            <div className="grid gap-4">
-              <WorldPicker />
-              <ModePicker />
-            </div>
+          <Panel title="Modo de color">
+            <ModePicker />
           </Panel>
 
           <Panel title="Perfil y monedas">

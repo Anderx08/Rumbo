@@ -4,52 +4,46 @@ Registro del sistema visual tal como está construido. Fuente de verdad: `src/ap
 
 ## Idea
 
-Cada cifra se lee como una posición en una ruta con fecha de llegada. Modo Operate: la tarea manda, la marca vive en los detalles.
+Cada cifra se lee con su consecuencia y su fecha de llegada, y anotar lo que entra o sale toma segundos. Modo Operate: la tarea manda.
 
-## Mundos
+## Apariencia
 
-Cuatro mundos intercambiables (`data-world` en `<html>`), cada uno con modo claro y oscuro (`data-mode`). Los componentes solo leen tokens; un mundo nuevo se agrega definiendo tokens y, si hace falta, una variante de cabecera en `src/components/hero.tsx`.
+Una sola apariencia, la **Clásica** (decisión del usuario, 16 nov 2026; antes hubo cuatro mundos visuales y se retiraron). Tiene modo claro y oscuro (`data-mode` en `<html>`), que se elige en Ajustes o sigue al sistema.
 
-| Mundo | Carácter | Tipografía | Radio | Borde de panel |
-| --- | --- | --- | --- | --- |
-| `rutas` (por defecto) | Diagrama de líneas de transporte: rótulo blanco sobre gris andén, líneas de 6px, estaciones circulares, tramo futuro punteado, cápsula terminal con fecha | Barlow 400 a 800 | 4 / 6 / 8px | 1.5px |
-| `mosaicos` | Color plano sobre negro puro, titulares gigantes en minúscula ligera, sin bordes | Open Sans 300 a 700 | 0 | ninguno |
-| `senal` | Bandas amarillas de aeropuerto, pictogramas en cuadros negros, cifras monumentales, barra lateral antracita | Hind 400 a 700 | 2px | ninguno |
-| `clasico` | Estándar fintech: tarjetas redondeadas con sombra suave, acento esmeralda | Geist | 8 / 10 / 14px | 1px |
+- Fondo gris claro `#f6f7f9`, tarjetas blancas con radio de 14px, borde `#e2e6eb` y sombra suave.
+- Tinta `#0f172a`, texto secundario `#475569`, acento esmeralda `#087f5b` para acciones primarias y el estado activo.
+- Tipografía Geist, pesos 400 a 600. Cifras tabulares solo en columnas.
+- Radios: 8px (pequeño), 10px (controles), 14px (tarjetas).
 
 ## Tokens
 
 - Superficie y tinta: `--bg`, `--panel`, `--panel-2`, `--ink`, `--ink-2`, `--ink-3`, `--rule`, `--rule-strong`.
 - Acción: `--accent`, `--accent-ink`, `--focus`.
-- Dominios del dinero, un color por línea: `--c-gasto`, `--c-ingreso`, `--c-meta`, `--c-deuda`, `--c-plan`, `--c-cuenta`, `--c-recur`, con su texto `--on-*`.
+- Dominios del dinero, un color por línea: `--c-gasto`, `--c-ingreso`, `--c-meta`, `--c-deuda`, `--c-plan`, `--c-cuenta`, `--c-recur`.
 - Estado, solo para texto y avisos: `--pos`, `--neg`, `--warn`.
-- Categorías: `--k0` a `--k7`. Una categoría guarda un índice (`hue`), no un color, así cambia con el mundo.
-- Estructura: `--r-sm/md/lg`, `--bw`, `--shadow`, `--w-head`, `--w-strong`, `--head-case`, `--size-page`.
-- Barra lateral y banda de página: `--side-*`, `--band-bg`, `--band-ink`.
+- Categorías: `--k0` a `--k7`. Una categoría guarda un índice (`hue`), no un color.
 
-Un elemento toma su color con `data-tone="meta"` o `data-hue="3"`, que fijan `--tone` y `--on-tone`.
+Un elemento toma su color con `data-tone="meta"` o `data-hue="3"`, que fijan `--tone`.
 
 ## Color en gráficos
 
-Las paletas de dominio y de categorías se validaron con el verificador de daltonismo (separación entre vecinos, banda de luminosidad, contraste) en claro y en oscuro. Reglas:
-
-- El texto usa tokens de tinta, nunca el color de la serie.
-- Leyenda siempre que haya dos series; las barras de categoría llevan su nombre al lado.
-- Barras de 24px como máximo, extremo de dato redondeado 4px, base cuadrada; líneas de 2px; rejilla sólida de 1px.
-- Cifras tabulares solo en columnas; las cifras grandes usan las proporcionales.
+Las paletas de dominio y de categorías se validaron con el verificador de daltonismo (separación entre vecinos, banda de luminosidad, contraste) en claro y en oscuro. El texto usa tokens de tinta, nunca el color de la serie; leyenda siempre que haya dos series; barras de 24px como máximo con extremo redondeado; líneas de 2px.
 
 ## Componentes
 
-- `Track`: progreso. En Rutas es una línea con estación en el punto de avance y resto punteado; en los demás, barra. `pace` dibuja la marca de referencia del día del mes.
-- `Stat`: cifra con etiqueta. En Mosaicos se vuelve mosaico de color.
-- `Bullet`: marcador de categoría o sección. Círculo en Rutas, cuadro en Mosaicos y Señalética, pastilla tintada en Clásico.
-- `terminal`: cápsula con la fecha de llegada al final de una línea.
-- `Sheet`: hoja lateral sobre `<dialog>` (inferior en móvil) para formularios.
-- Cabecera del panel por mundo: ruta del mes, mosaicos, banda con decisiones o tarjetas.
+- `Stat`: tarjeta con punto de color, etiqueta, cifra y nota.
+- `Track`: barra de progreso; `pace` dibuja la marca del día del mes.
+- `Bullet`: icono sobre un cuadro redondeado tintado con el color de su categoría o dominio.
+- `terminal`: píldora gris con la fecha de llegada al final de una línea.
+- `callout`: aviso con acción (por ejemplo, «Hoy toca: Quincena»).
+- `Sheet`: hoja lateral de 460px en escritorio; en el celular ocupa toda la pantalla.
+- `Segmented` con `wide`: selector grande de ancho completo (tipo de movimiento).
 
 ## Reglas
 
-- Sin texto en degradado, sin vidrio, sin franjas de color laterales en tarjetas, sin etiquetas pequeñas sobre los títulos.
-- Movimiento: un solo momento por mundo (la línea del mes se dibuja al cargar). Transiciones de 150 a 260 ms. Se respeta `prefers-reduced-motion`.
+- Dentro de `.sheet-content` ningún bloque se encoge (`flex-shrink: 0`). Sin esto, el selector Gasto/Ingreso, que tiene `overflow` propio, quedaba aplastado en una línea cuando el formulario era más alto que la pantalla.
+- Al abrir una hoja, el foco va al primer campo con `preventScroll` y el contenido vuelve arriba.
 - Los `@keyframes` van fuera de `@layer components`: dentro, el compilador descarta las reglas que siguen.
+- Campos de 16px como mínimo para que iOS no haga zoom.
 - Escritorio con barra lateral desde 961px; por debajo, barra inferior con botón central para anotar.
+- Movimiento: transiciones de 150 a 260 ms; se respeta `prefers-reduced-motion`.

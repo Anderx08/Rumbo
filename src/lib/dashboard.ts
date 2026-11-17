@@ -1,13 +1,5 @@
+import { addMonths, endOfMonth, monthKey, monthShort } from "./dates";
 import {
-  addMonths,
-  daysInMonth,
-  endOfMonth,
-  fmtDate,
-  monthKey,
-  monthShort,
-} from "./dates";
-import {
-  accountsById,
   balances,
   budgetStatus,
   debtInputs,
@@ -22,6 +14,7 @@ import {
   toBase,
   upcoming,
   type FiInput,
+  type Occurrence,
 } from "./engine";
 import { horizon } from "./health";
 import { fmt, pct } from "./money";
@@ -36,19 +29,8 @@ export interface LineItem {
   title: string;
   detail: string;
   progress: number;
-  /** Texto de la estación terminal: a dónde llega y cuándo. */
+  /** A dónde llega y cuándo. */
   terminal: string;
-  /** Cifra corta para mosaicos y señales. */
-  short: string;
-}
-
-export interface RouteStop {
-  kind: "start" | "income" | "expense" | "now" | "end";
-  pos: number;
-  date: string;
-  label: string;
-  amount?: string;
-  future: boolean;
 }
 
 /** Entradas del plan de largo plazo: lo que el usuario fijó o lo calculado. */
@@ -76,12 +58,14 @@ export function debtStart(d: Data) {
     );
 }
 
+/** Ingresos recurrentes que ya tocan (hoy o atrasados), los más viejos primero. */
+export function dueIncome(d: Data, todayIso: string): Occurrence[] {
+  return upcoming(d, todayIso).filter((o) => o.recurring.type === "income" && o.date === o.recurring.nextDate);
+}
+
 export function buildDashboard(d: Data, todayIso: string) {
   const base = d.settings.base;
   const key = monthKey(todayIso);
-  const days = daysInMonth(key);
-  const day = Number(todayIso.slice(8, 10));
-  const accounts = accountsById(d);
 
   const remaining = remainingToSpend(d, todayIso);
   const flow = monthFlow(d, key);
@@ -90,7 +74,6 @@ export function buildDashboard(d: Data, todayIso: string) {
   const status = budgetStatus(d, key, todayIso);
   const avg = monthlyAverages(d, key);
 
-  /* --- Las cuatro líneas --- */
   const budgetRatio = status.totalBudget > 0 ? status.totalSpent / status.totalBudget : null;
   const gasto: LineItem = {
     key: "gasto",
@@ -103,7 +86,6 @@ export function buildDashboard(d: Data, todayIso: string) {
         : `${fmt(flow.expense, base)} gastados, sin presupuesto definido`,
     progress: budgetRatio != null ? clamp(budgetRatio) : flow.income > 0 ? clamp(flow.expense / flow.income) : 0,
     terminal: budgetRatio != null ? `${pct(budgetRatio)} del presupuesto` : "Crear presupuesto",
-    short: budgetRatio != null ? pct(budgetRatio) : fmt(flow.expense, base, { compact: true }),
   };
 
   const goals = d.goals.map((goal) => ({ goal, stats: goalStats(goal, todayIso) }));
@@ -120,7 +102,6 @@ export function buildDashboard(d: Data, todayIso: string) {
         detail: `${fmt(focus.stats.saved, focus.goal.currency)} de ${fmt(focus.goal.target, focus.goal.currency)}`,
         progress: focus.stats.ratio,
         terminal: focus.stats.eta ? `Llegada ${monthShort(focus.stats.eta)}` : "Sin aportes recientes",
-        short: focus.stats.eta ? monthShort(focus.stats.eta) : pct(focus.stats.ratio),
       }
     : {
         key: "meta",
@@ -130,7 +111,6 @@ export function buildDashboard(d: Data, todayIso: string) {
         detail: goals.length ? "Cumpliste todas tus metas" : "Define a dónde quieres llegar",
         progress: goals.length ? 1 : 0,
         terminal: goals.length ? "Cumplidas" : "Crear meta",
-        short: goals.length ? "Listo" : "Sin metas",
       };
 
   const debts = debtInputs(d);
@@ -147,7 +127,6 @@ export function buildDashboard(d: Data, todayIso: string) {
         detail: `Debes ${fmt(debtTotal, base)}`,
         progress: start > 0 ? clamp(1 - debtTotal / start) : 0,
         terminal: freeMonth ? `Deuda cero ${monthShort(freeMonth)}` : "El pago no cubre los intereses",
-        short: freeMonth ? monthShort(freeMonth) : "Revisar",
       }
     : {
         key: "deuda",
@@ -157,12 +136,12 @@ export function buildDashboard(d: Data, todayIso: string) {
         detail: "No tienes deudas registradas",
         progress: 1,
         terminal: "Sin deudas",
-        short: "Cero",
       };
 
   const input = fiInput(d, todayIso);
   const fi = fiProjection(input);
-  const fiYear = fi.months != null ? Number(key.slice(0, 4)) + Math.floor((Number(key.slice(5, 7)) - 1 + fi.months) / 12) : null;
+  const fiYear =
+    fi.months != null ? Number(key.slice(0, 4)) + Math.floor((Number(key.slice(5, 7)) - 1 + fi.months) / 12) : null;
   const hasPlan = input.annualSpend > 0 && Number.isFinite(fi.target);
   const plan: LineItem = {
     key: "plan",
@@ -174,61 +153,10 @@ export function buildDashboard(d: Data, todayIso: string) {
       : "Registra gastos para calcular tu meta de independencia",
     progress: hasPlan ? clamp(input.invested / fi.target) : 0,
     terminal: !hasPlan ? "Ver el plan" : fiYear ? `Independencia ${fiYear}` : "A más de 60 años",
-    short: !hasPlan ? "Plan" : fiYear ? String(fiYear) : "+60 años",
   };
-
-  /* --- La ruta del mes --- */
-  const pos = (iso: string) => (days > 1 ? (Number(iso.slice(8, 10)) - 1) / (days - 1) : 0);
-  const stops: RouteStop[] = [
-    { kind: "start", pos: 0, date: `${key}-01`, label: fmtDate(`${key}-01`), future: false },
-  ];
-  const incomeByDate = new Map<string, { amount: number; note: string }>();
-  for (const tx of d.txs) {
-    if (tx.type !== "income" || monthKey(tx.date) !== key || tx.date > todayIso) continue;
-    const v = toBase(d, tx.amount, accounts.get(tx.accountId)?.currency ?? base);
-    const prev = incomeByDate.get(tx.date);
-    incomeByDate.set(tx.date, { amount: (prev?.amount ?? 0) + v, note: prev?.note ?? tx.note });
-  }
-  for (const [date, v] of [...incomeByDate.entries()].sort().slice(-2)) {
-    if (date === todayIso) continue;
-    stops.push({
-      kind: "income",
-      pos: pos(date),
-      date,
-      label: v.note || "Ingreso",
-      amount: fmt(v.amount, base, { sign: true }),
-      future: false,
-    });
-  }
-  stops.push({ kind: "now", pos: pos(todayIso), date: todayIso, label: "Hoy", future: false });
-
-  const monthEnd = endOfMonth(key);
-  const ahead = upcoming(d, monthEnd).filter((o) => o.date >= todayIso);
-  const worth = (o: (typeof ahead)[number]) =>
-    toBase(d, o.recurring.amount, accounts.get(o.recurring.accountId)?.currency ?? base);
-  const bigExpenses = ahead
-    .filter((o) => o.recurring.type === "expense")
-    .sort((a, b) => worth(b) - worth(a))
-    .slice(0, 3);
-  for (const o of [...ahead.filter((x) => x.recurring.type === "income"), ...bigExpenses]) {
-    stops.push({
-      kind: o.recurring.type,
-      pos: pos(o.date),
-      date: o.date,
-      label: o.recurring.name,
-      amount: fmt(worth(o), base, { sign: o.recurring.type === "income" }),
-      future: true,
-    });
-  }
-  if (todayIso !== monthEnd) {
-    stops.push({ kind: "end", pos: 1, date: monthEnd, label: fmtDate(monthEnd), future: true });
-  }
-  stops.sort((a, b) => a.pos - b.pos || (a.kind === "now" ? -1 : 1));
 
   return {
     key,
-    day,
-    days,
     remaining,
     flow,
     net,
@@ -236,8 +164,8 @@ export function buildDashboard(d: Data, todayIso: string) {
     status,
     avg,
     lines: [gasto, meta, deuda, plan],
-    stops,
     next: upcoming(d, horizon(todayIso)),
+    due: dueIncome(d, todayIso),
     goals,
     debtTotal,
     freeMonth,

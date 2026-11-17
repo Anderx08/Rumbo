@@ -10,6 +10,7 @@ import {
 import { convert } from "./money";
 import {
   LIQUID_TYPES,
+  SPENDING_TYPES,
   isLiability,
   type Account,
   type Category,
@@ -234,6 +235,21 @@ export function advance(iso: string, frequency: Frequency): string {
   return `${addMonths(key, 1)}-15`;
 }
 
+/** Próximo día de quincena (15 o fin de mes), contando hoy. */
+export function nextPayday(iso: string): string {
+  const key = monthKey(iso);
+  const day = Number(iso.slice(8, 10));
+  if (day <= 15) return `${key}-15`;
+  return `${key}-${pad(daysInMonth(key))}`;
+}
+
+/**
+ * Fecha con la que se registra un pago recurrente: la programada si ya pasó,
+ * o hoy si llegó antes de tiempo (nunca una fecha futura).
+ */
+export const postingDate = (scheduled: string, todayIso: string) =>
+  scheduled > todayIso ? todayIso : scheduled;
+
 export function monthlyEquivalent(r: Pick<Recurring, "amount" | "frequency">) {
   switch (r.frequency) {
     case "weekly":
@@ -345,15 +361,23 @@ export interface Remaining {
   perDay: Money;
   daysLeft: number;
   /** De dónde sale la cifra. */
-  basis: "budget" | "income";
+  basis: "budget" | "balance";
   /** Pagos recurrentes ya comprometidos de aquí a fin de mes. */
   committed: Money;
 }
 
+/** Saldo de las cuentas del día a día (efectivo y cuentas corrientes), en moneda base. */
+export function spendingBalance(d: Data) {
+  const bal = balances(d);
+  return d.accounts
+    .filter((a) => !a.archived && SPENDING_TYPES.includes(a.type))
+    .reduce((s, a) => s + toBase(d, bal.get(a.id) ?? 0, a.currency), 0);
+}
+
 /**
  * Lo que queda libre para gastar este mes. Con presupuesto: lo no gastado de
- * cada categoría menos los pagos fijos que aún faltan. Sin presupuesto:
- * ingresos menos gastos menos pagos fijos pendientes.
+ * cada categoría menos los pagos fijos que aún faltan. Sin presupuesto: el
+ * dinero de las cuentas del día a día menos los pagos fijos que aún faltan.
  */
 export function remainingToSpend(d: Data, todayIso: string): Remaining {
   const key = monthKey(todayIso);
@@ -384,9 +408,8 @@ export function remainingToSpend(d: Data, todayIso: string): Remaining {
       0,
     );
   } else {
-    basis = "income";
-    const flow = monthFlow(d, key);
-    amount = Math.max(0, flow.income - flow.expense - committed);
+    basis = "balance";
+    amount = Math.max(0, spendingBalance(d) - committed);
   }
   return {
     amount,

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SECTIONS } from "./nav";
-import { addMonthsToDate, daysInMonth, lastMonths } from "./dates";
+import { addMonthsToDate, daysInMonth, lastMonths, today } from "./dates";
 import {
   advance,
   balances,
@@ -11,10 +11,14 @@ import {
   goalStats,
   monthlyEquivalent,
   netWorth,
+  nextPayday,
+  postingDate,
   remainingToSpend,
   simulatePayoff,
   upcoming,
 } from "./engine";
+import { useStore } from "./store";
+import { defaultAccountId } from "./types";
 import { healthScore, insights } from "./health";
 import { convert, fmt, parseAmount } from "./money";
 import { demoData, emptyData } from "./seed";
@@ -130,10 +134,22 @@ describe("presupuesto", () => {
     expect(r.committed).toBe(25_000_00);
   });
 
-  it("sin presupuesto usa ingresos menos gastos", () => {
-    const r = remainingToSpend(sample(), "2026-11-16");
-    expect(r.basis).toBe("income");
-    expect(r.amount).toBe(530_000_00);
+  it("sin presupuesto usa el dinero de las cuentas del día a día", () => {
+    const d = sample();
+    // Solo cuenta la corriente: ni los ahorros en dólares ni la tarjeta.
+    const r = remainingToSpend(d, "2026-11-16");
+    expect(r.basis).toBe("balance");
+    expect(r.amount).toBe(550_000_00);
+    d.recurring = [
+      { id: "r", name: "Alquiler", type: "expense", amount: 240_000_00, accountId: "crc", frequency: "monthly", nextDate: "2026-11-28", active: true },
+    ];
+    expect(remainingToSpend(d, "2026-11-16").amount).toBe(310_000_00);
+  });
+
+  it("alguien que recién empieza ve lo que tiene, no cero", () => {
+    const d = emptyData();
+    d.accounts = [{ id: "a", name: "Mi dinero", type: "checking", currency: "CRC", opening: 300_000_00, primary: true }];
+    expect(remainingToSpend(d, "2026-11-16").amount).toBe(300_000_00);
   });
 });
 
@@ -256,6 +272,55 @@ describe("largo plazo", () => {
     expect(grow.months).not.toBeNull();
     expect(grow.months!).toBeLessThan(flat.months!);
     expect(grow.series[1].value).toBeGreaterThan(grow.series[1].contributed);
+  });
+});
+
+describe("quincena y cuenta por defecto", () => {
+  it("la próxima quincena es el 15 o el fin de mes, contando hoy", () => {
+    expect(nextPayday("2026-11-03")).toBe("2026-11-15");
+    expect(nextPayday("2026-11-15")).toBe("2026-11-15");
+    expect(nextPayday("2026-11-16")).toBe("2026-11-30");
+    expect(nextPayday("2027-02-20")).toBe("2027-02-28");
+  });
+
+  it("un pago que llega antes de tiempo se registra con la fecha de hoy", () => {
+    expect(postingDate("2026-11-30", "2026-11-28")).toBe("2026-11-28");
+    expect(postingDate("2026-11-15", "2026-11-16")).toBe("2026-11-15");
+  });
+
+  it("la cuenta por defecto es la principal, si no la de gasto diario", () => {
+    const base = { currency: "CRC" as const, opening: 0 };
+    const card = { ...base, id: "t", name: "Tarjeta", type: "credit" as const };
+    const savings = { ...base, id: "s", name: "Ahorros", type: "savings" as const };
+    const cash = { ...base, id: "c", name: "Efectivo", type: "cash" as const };
+    expect(defaultAccountId([card, savings, cash])).toBe("c");
+    expect(defaultAccountId([card, savings])).toBe("s");
+    expect(defaultAccountId([card, { ...savings, primary: true }, cash])).toBe("s");
+    expect(defaultAccountId([])).toBe("");
+  });
+
+  it("empezar sin elegir cuenta crea la cuenta principal y la quincena", () => {
+    useStore.getState().startEmpty({ name: "Ana", balance: 300_000_00, quincena: 425_000_00 });
+    const d = useStore.getState().data;
+    expect(d.onboarded).toBe(true);
+    expect(d.accounts).toHaveLength(1);
+    expect(d.accounts[0]).toMatchObject({ name: "Mi dinero", primary: true, opening: 300_000_00, currency: "CRC" });
+    expect(d.recurring).toHaveLength(1);
+    expect(d.recurring[0]).toMatchObject({ type: "income", amount: 425_000_00, frequency: "semimonthly", accountId: d.accounts[0].id });
+
+    // Registrarla crea el ingreso con fecha válida y avanza a la siguiente quincena.
+    const before = d.recurring[0].nextDate;
+    useStore.getState().postRecurring(d.recurring[0].id);
+    const after = useStore.getState().data;
+    expect(after.txs).toHaveLength(1);
+    expect(after.txs[0]).toMatchObject({ type: "income", amount: 425_000_00, categoryId: "salario" });
+    expect(after.txs[0].date <= today()).toBe(true);
+    expect(after.recurring[0].nextDate > before).toBe(true);
+  });
+
+  it("sin quincena no se programa ningún ingreso", () => {
+    useStore.getState().startEmpty({ name: "", balance: 0, quincena: 0 });
+    expect(useStore.getState().data.recurring).toHaveLength(0);
   });
 });
 
