@@ -4,6 +4,8 @@ Finanzas personales con fecha de llegada: registra ingresos, gastos y transferen
 
 Los datos se guardan solo en el navegador (localStorage). No hay cuenta ni servidor.
 
+**Publicada en <https://rumbo-orpin-five.vercel.app>** (Vercel, equipo EspTeam). Cada push a `main` despliega una versión nueva.
+
 ## Uso
 
 ```bash
